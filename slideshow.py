@@ -64,11 +64,21 @@ def optimiser_diaporama(diapositives):
         modele.addConstr(gp.quicksum(Z[i, j] for j in range(n_diapositives) if i != j) == 1)
         modele.addConstr(gp.quicksum(Z[j, i] for j in range(n_diapositives) if i != j) == 1)
 
-    # Fonction objectif: maximiser l'intérêt total
+    # ** Empêcher les auto-références (éviter que i pointe vers lui-même)**
+    for i in range(n_diapositives):
+        modele.addConstr(Z[i, i] == 0)
+
+    # ** Empêcher les Cycles**
+    for i in range(n_diapositives):
+        for j in range(n_diapositives):
+            if i != j:
+                modele.addConstr(Z[i, j] + Z[j, i] <= 1, name=f"AntiCycle_{i}_{j}")
+    
+    # Fonction objectif: maximiser le score
     modele.setObjective(
         gp.quicksum(
             calculer_facteur_interet(diapositives[i]["etiquettes"], diapositives[j]["etiquettes"]) * Z[i, j]
-            for i in range(n_diapositives) for j in range(n_diapositives) if i != j
+            for i in range(n_diapositives) for j in range(n_diapositives) if j == i+1
         ),
         GRB.MAXIMIZE
     )
@@ -82,6 +92,7 @@ def optimiser_diaporama(diapositives):
                     ordre.append((i, j))
     return ordre
 
+
 def ecrire_fichier_sortie(fichier_sortie, ordre, diapositives):
     """
     Écrire le fichier de sortie au format attendu.
@@ -94,6 +105,7 @@ def ecrire_fichier_sortie(fichier_sortie, ordre, diapositives):
             if id_diapositive not in diapositives_utilisees:
                 fichier.write(" ".join(map(str, id_diapositive)) + "\n")
                 diapositives_utilisees.add(id_diapositive)
+
 
 def principal():
     if len(sys.argv) != 2:
